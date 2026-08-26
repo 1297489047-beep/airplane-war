@@ -712,6 +712,7 @@
     if (e.dying) {
       const phase = 1 - e.deathTimer / e.deathT;
       if (Math.floor(phase * 6) % 2 !== 0) { ctx.restore(); return; }
+      ctx.filter = 'brightness(3) saturate(0.2)';
     }
     if (e.type === 'boss') {
       const g = ctx.createLinearGradient(0, -55, 0, 55);
