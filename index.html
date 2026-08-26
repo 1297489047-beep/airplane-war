@@ -231,7 +231,7 @@
   let mouseX = W / 2, mouseY = H - 140, usingMouse = false;
 
   // ==================== 实体容器 ====================
-  let bullets = [], enemies = [], enemyBullets = [], particles = [], powerups = [], bombs = [];
+  let bullets = [], enemies = [], enemyBullets = [], particles = [], powerups = [], muzzles = [], bombs = [];
 
   const player = {
     x: W / 2, y: H - 140, w: 46, h: 54,
@@ -336,8 +336,14 @@
   // ==================== 玩家开火 ====================
   function fire() {
     player.fireCd = 0.14;
-    const x = player.x, y = player.y - player.h / 2;
-    const make = (dx, dmg = 1) => bullets.push({ x, y, vx: dx * 90, vy: -760, w: 5, h: 14, dmg, color: dx === 0 ? '#7fd7ff' : '#ffd54f' });
+    const y = player.y - player.h / 2;
+    const make = (dx) => {
+      const x = player.x + dx * 14;
+      const color = dx === 0 ? '#7fd7ff' : '#ffd54f';
+      bullets.push({ x, y, vx: dx * 90, vy: -760, w: 5, h: 14, dmg: 1, color });
+      // 枪口闪光
+      muzzles.push({ x, y, life: 0.09, max: 0.09, r: rand(6, 10), color: '#b3f0ff', vx: rand(-24, 24), vy: rand(-40, -12) });
+    };
     if (power >= 3) { make(0); make(-0.32); make(0.32); }
     else if (power >= 2) { make(-0.16); make(0.16); }
     else { make(0); }
@@ -408,7 +414,7 @@
   function startGame() {
     score = 0; lives = 3; power = 1; powerExp = 0;
     frame = 0; spawnTimer = 0; bossTimer = 0;
-    bullets = []; enemies = []; enemyBullets = []; particles = []; powerups = []; bombs = [];
+    bullets = []; enemies = []; enemyBullets = []; particles = []; powerups = []; muzzles = []; bombs = [];
     player.x = W / 2; player.y = H - 140;
     player.invuln = 2; player.shield = 0; player.fireCd = 0;
     updateHud();
@@ -583,6 +589,13 @@
       p.life -= dt;
     }
     particles = particles.filter(p => p.life > 0);
+
+    // ---- 枪口闪光 ----
+    for (const m of muzzles) {
+      m.x += m.vx * dt; m.y += m.vy * dt;
+      m.life -= dt;
+    }
+    muzzles = muzzles.filter(m => m.life > 0);
   }
 
   function hitPlayer() {
@@ -751,14 +764,25 @@
       ctx.restore();
     }
 
-    // 子弹
+    // 子弹（能量弹 + 光晕）
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
     for (const b of bullets) {
-      const g = ctx.createLinearGradient(0, -b.h, 0, b.h);
-      g.addColorStop(0, b.color);
-      g.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      const rg = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.h * 1.2);
+      rg.addColorStop(0, b.color);
+      rg.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = rg;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.h * 1.2, 0, Math.PI * 2);
+      ctx.fill();
+      const g = ctx.createLinearGradient(0, b.y - b.h / 2, 0, b.y + b.h / 2);
+      g.addColorStop(0, '#ffffff');
+      g.addColorStop(0.35, b.color);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = g;
       ctx.fillRect(b.x - b.w / 2, b.y - b.h / 2, b.w, b.h);
     }
+    ctx.restore();
 
     // 敌弹
     for (const b of enemyBullets) {
@@ -783,6 +807,22 @@
       ctx.fill();
     }
     ctx.globalAlpha = 1;
+
+    // 枪口闪光
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const m of muzzles) {
+      const a = m.life / m.max;
+      const rg = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, m.r * 2.4);
+      rg.addColorStop(0, 'rgba(255,255,255,' + (a * 0.95) + ')');
+      rg.addColorStop(0.35, 'rgba(140,230,255,' + (a * 0.55) + ')');
+      rg.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = rg;
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, m.r * 2.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
 
     // 玩家
     if (state === State.PLAYING || state === State.PAUSED) drawPlayer();
