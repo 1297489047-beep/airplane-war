@@ -333,6 +333,13 @@
     }
   }
 
+  // ==================== 敌机死亡 ====================
+  function markDying(e) {
+    e.dying = true;
+    e.deathT = e.type === 'boss' ? 1.2 : 0.6;
+    e.deathTimer = e.deathT;
+  }
+
   // ==================== 玩家开火 ====================
   function fire() {
     player.fireCd = 0.14;
@@ -505,6 +512,7 @@
 
     // ---- 敌机更新 ----
     for (const e of enemies) {
+      if (e.dying) { e.deathTimer -= dt; continue; }
       e.phase += dt * 3;
       if (e.type === 'boss') {
         if (e.enter) { e.y += e.vy * dt; if (e.y > 120) { e.y = 120; e.enter = false; } }
@@ -521,7 +529,7 @@
         e.fireCd = e.type === 'boss' ? rand(1.0, 1.6) : rand(1.5, 3.0);
       }
     }
-    enemies = enemies.filter(e => e.y < H + e.h + 40);
+    enemies = enemies.filter(e => e.y < H + e.h + 40 && !(e.dying && e.deathTimer <= 0));
 
     // ---- 玩家子弹命中敌机 ----
     for (const b of bullets) {
@@ -532,6 +540,7 @@
           e.hp -= b.dmg;
           explode(b.x, b.y - 6, '#7fd7ff', 6);
           if (e.hp <= 0) {
+            markDying(e);
             score += e.score;
             explode(e.x, e.y, e.color, e.type === 'boss' ? 70 : 26, e.type === 'boss');
             sfx.boom();
@@ -553,6 +562,7 @@
         if (e.hp <= 0) continue;
         if (rectsOverlap({ x: player.x, y: player.y, w: player.w * 0.7, h: player.h * 0.8 }, e)) {
           e.hp = 0;
+          markDying(e);
           explode(e.x, e.y, e.color, 24);
           hitPlayer();
           break;
@@ -624,9 +634,9 @@
     } else if (type === 'B') {
       // 炸弹：清屏
       for (const e of enemies) {
-        if (e.hp > 0) { score += e.score; explode(e.x, e.y, e.color, 20); }
+        if (!e.dying) { score += e.score; explode(e.x, e.y, e.color, 20); }
       }
-      enemies = enemies.filter(e => e.hp <= 0);
+      enemies = [];
       enemyBullets = [];
       sfx.boom();
     }
@@ -699,6 +709,10 @@
   function drawEnemy(e) {
     ctx.save();
     ctx.translate(e.x, e.y);
+    if (e.dying) {
+      const phase = 1 - e.deathTimer / e.deathT;
+      if (Math.floor(phase * 6) % 2 !== 0) { ctx.restore(); return; }
+    }
     if (e.type === 'boss') {
       const g = ctx.createLinearGradient(0, -55, 0, 55);
       g.addColorStop(0, '#ff8a80');
